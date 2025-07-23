@@ -9,46 +9,59 @@ from scipy import stats
 import math
 
 class UCB_MAB_Agent:
-    def __init__(self, n_arms):
+    def __init__(self, n_arms, gamma=0.1):
         """
-        Initialize the UCB agent.
+        Initialize the Exp3 agent (renamed methods kept).
 
         Parameters:
         n_arms (int): Number of arms (actions).
+        gamma (float): Exploration parameter in (0,1].
         """
         self.n_arms = n_arms
-        self.counts = np.zeros(n_arms)  # Number of times each arm has been pulled
-        self.values = np.zeros(n_arms)  # Estimated value of each arm
+        self.gamma = gamma
+        # Initialize weights uniformly
+        self.weights = np.ones(n_arms)
+        # Current probability distribution over arms
+        self.probs = np.ones(n_arms) / n_arms
 
-    def select_arm(self,n_agents):
+    def select_arm(self, n_agents):  # signature unchanged
         """
-        Select an arm to pull using the UCB algorithm.
+        Select an arm to pull using the Exp3 algorithm.
+
+        Parameters:
+        n_agents: (unused, kept for signature consistency)
 
         Returns:
         int: The index of the selected arm.
         """
-        total_counts = np.sum(self.counts)
-        if total_counts < self.n_arms:
-            # Pull each arm once before applying UCB formula
-            return int(total_counts)
+        # Compute probability distribution
+        total_weight = np.sum(self.weights)
+        # Weighted component plus exploration
+        self.probs = (1 - self.gamma) * (self.weights / total_weight) + self.gamma / self.n_arms
+        # Draw arm according to probabilities
+        chosen_arm = np.random.choice(self.n_arms, p=self.probs)
+        return int(chosen_arm)
 
-        ucb_values = self.values + np.sqrt( np.log(total_counts) / (self.counts + 1e-5))
-        return np.argmax(ucb_values)
-
-    def update(self, arm, reward):
+    def update(self, arm, reward):  # signature unchanged
         """
-        Update the estimated value of the chosen arm.
+        Update the weights of the chosen arm based on observed reward.
 
         Parameters:
         arm (int): The index of the chosen arm.
-        reward (float): The observed reward.
+        reward (float): The observed reward, assumed in [0, 1].
         """
-        self.counts[arm] += 1
-        n = self.counts[arm]
-        self.values[arm] = ((n - 1) * self.values[arm] + reward) / n
+        # Importance-weighted reward estimate
+        x = reward / (self.probs[arm] + 1e-12)
+        # Update weight for the chosen arm
+        growth_factor = np.exp((self.gamma * x) / self.n_arms)
+        self.weights[arm] *= growth_factor
 
-    def return_max(self):
-      return np.max(self.values)
+    def return_max(self):  # unchanged
+        """
+        Return the maximum weight among all arms.
+        """
+        return np.max(self.weights)
+
     
 def sic_decoder(channel_coefficients, power_allocations, noise_power):
     """
